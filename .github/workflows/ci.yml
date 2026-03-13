@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  push:
+    branches: [main, next, "release/**"]
+  pull_request:
+    branches: [main, next, "release/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  publish:
+    name: Publish & Release
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/next' || startsWith(github.ref, 'refs/heads/release/'))
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Check if version changed
+        id: version
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view @trueburn/spring-config-client version 2>/dev/null || echo "0.0.0")
+          echo "current=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+          if [ "$PACKAGE_VERSION" != "$NPM_VERSION" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Version changed: $NPM_VERSION -> $PACKAGE_VERSION"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "Version unchanged: $PACKAGE_VERSION"
+          fi
+
+      - name: Determine npm dist-tag
+        if: steps.version.outputs.changed == 'true'
+        id: dist-tag
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          VERSION="${{ steps.version.outputs.current }}"
+
+          if [ "$BRANCH" = "next" ]; then
+            # next branch always publishes as @next
+            echo "tag=next" >> $GITHUB_OUTPUT
+            echo "Branch 'next': publishing with --tag next"
+          elif echo "$BRANCH" | grep -qE '^release/'; then
+            # release/* branches publish as @release-N.x (e.g. release/1.x -> @release-1.x)
+            RELEASE_TAG=$(echo "$BRANCH" | sed 's|release/||; s|/|-|g')
+            echo "tag=release-${RELEASE_TAG}" >> $GITHUB_OUTPUT
+            echo "Maintenance branch '$BRANCH': publishing with --tag release-${RELEASE_TAG}"
+          elif echo "$VERSION" | grep -qE '\-(alpha|beta|rc|next|canary|dev)'; then
+            # Prerelease version on main (shouldn't happen with this strategy, but safe fallback)
+            echo "tag=next" >> $GITHUB_OUTPUT
+            echo "Prerelease version on main: publishing with --tag next"
+          else
+            # Stable release on main
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "Stable release on main: publishing with --tag latest"
+          fi
+
+      - name: Publish to npm
+        if: steps.version.outputs.changed == 'true'
+        run: npm publish --provenance --access public --tag ${{ steps.dist-tag.outputs.tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create git tag
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          VERSION="v${{ steps.version.outputs.current }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+
+      - name: Generate release notes
+        if: steps.version.outputs.changed == 'true'
+        id: notes
+        run: |
+          VERSION="v${{ steps.version.outputs.current }}"
+
+          # Find the previous tag
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "$VERSION" | head -n 1)
+
+          if [ -z "$PREV_TAG" ]; then
+            # First release -- include all commits
+            COMMITS=$(git log --pretty=format:"- %s (%h)" HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..HEAD")
+          fi
+
+          # Build release body
+          {
+            echo "body<<RELEASE_EOF"
+            echo "## What's Changed"
+            echo ""
+            echo "$COMMITS"
+            echo ""
+            echo "---"
+            echo ""
+            echo "**npm:** \`npm install @trueburn/spring-config-client@${{ steps.version.outputs.current }}\`"
+            echo ""
+            echo "**Full Changelog:** https://github.com/trueburn/node-spring-config-client/compare/${PREV_TAG:-initial}...${VERSION}"
+            echo "RELEASE_EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.changed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.current }}
+          name: v${{ steps.version.outputs.current }}
+          body: ${{ steps.notes.outputs.body }}
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.current, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
