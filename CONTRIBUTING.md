@@ -5,7 +5,7 @@ Thanks for your interest in contributing! This project aims to be a reliable, mi
 ## Getting Started
 
 ```bash
-git clone https://github.com/trueburn/node-spring-config-client.git
+git clone https://github.com/TrueBurn/node-spring-config-client.git
 cd node-spring-config-client
 npm install
 npm test

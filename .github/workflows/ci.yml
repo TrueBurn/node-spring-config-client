@@ -151,7 +151,7 @@ jobs:
             echo ""
             echo "**npm:** \`npm install @trueburn/spring-config-client@${{ steps.version.outputs.current }}\`"
             echo ""
-            echo "**Full Changelog:** https://github.com/trueburn/node-spring-config-client/compare/${PREV_TAG:-initial}...${VERSION}"
+            echo "**Full Changelog:** https://github.com/TrueBurn/node-spring-config-client/compare/${PREV_TAG:-initial}...${VERSION}"
             echo "RELEASE_EOF"
           } >> $GITHUB_OUTPUT
 

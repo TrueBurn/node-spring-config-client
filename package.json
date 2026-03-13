@@ -7,12 +7,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/trueburn/node-spring-config-client.git"
+    "url": "git+https://github.com/TrueBurn/node-spring-config-client.git"
   },
   "bugs": {
-    "url": "https://github.com/trueburn/node-spring-config-client/issues"
+    "url": "https://github.com/TrueBurn/node-spring-config-client/issues"
   },
-  "homepage": "https://github.com/trueburn/node-spring-config-client#readme",
+  "homepage": "https://github.com/TrueBurn/node-spring-config-client#readme",
   "author": "trueburn",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
