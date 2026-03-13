@@ -1,6 +1,6 @@
 {
   "name": "@trueburn/spring-config-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Spring Cloud Config Server client for Node.js/Next.js -- bootstraps remote configuration into process.env at startup",
   "publishConfig": {
     "access": "public"
