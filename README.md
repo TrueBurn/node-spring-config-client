@@ -12,6 +12,14 @@ Bootstraps remote configuration into `process.env` at startup -- so your non-JVM
 
 Your Spring Boot services already use Spring Cloud Config Server for centralised configuration. When a non-JVM service (Next.js, Express, Fastify) joins the platform, you don't want config sprawl across Helm values and GitOps repos. This package lets Node.js apps pull config from the same server, using the same YAML files, with a single env var to enable it.
 
+## Who Is This For
+
+- Teams running **Spring Cloud Config Server** that need Node.js services to consume the same config
+- **Next.js, Express, Fastify, or any Node.js app** -- works with both ESM and CommonJS
+- **TypeScript and JavaScript** projects -- ships native declarations, no `@types` package needed
+- Teams that want **zero-code bootstrap** -- set env vars, import one module, done
+- Production workloads that need **retry with backoff, fail-fast, and request timeouts**
+
 ## Design Principles
 
 - **Zero config files** -- configured entirely via env vars (no `bootstrap.yml`)
